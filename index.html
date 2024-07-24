@@ -2,11 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=PT+Mono&display=swap" rel="stylesheet">
   <title>Love Song</title>
   <style>
   body {
     margin: 0;
     background-color: #000;
+    font-family: "PT Mono", monospace;
   }
   article {
     position: absolute;
@@ -61,7 +65,7 @@ var flapLines
     }
   }
 
-  SETTINGS.font = SETTINGS.lineHeight + "px Courier New,monospace"
+  SETTINGS.font = SETTINGS.lineHeight + "px Courier New,PT Mono,monospace"
 
   ;(function initializeCanvas(){
     canvas.width = WIDTH
