@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Love Song</title>
+  <style>
+  body {
+    margin: 0;
+    background-color: #000;
+  }
+  article {
+    position: absolute;
+    box-sizing: border-box;
+    top: calc(50vh - 50vmin);
+    left: calc(50vw - 50vmin);
+    width: 100vmin;
+    height: 100vmin;
+  }
+  canvas {
+    width: 100%;
+    opacity: 1;
+    transition: opacity 5s ease-in-out;
+    -moz-transition: opacity 5s ease-in-out;
+    -webkit-transition: opacity 5s ease-in-out;
+  }
+  canvas.fade {
+    opacity: 0;
+  }
+  </style>
+</head>
+<body>
+<article>
+  <canvas></canvas>
+</article>
+
+<script>
+var flapLines
+
+;(function initialize(){
+  var canvas = document.querySelector("canvas")
+  var context = canvas.getContext("2d")
+
+  // Canvas
+  var WIDTH = 1500
+  var HEIGHT = 1500
+  var LINE_HEIGHT = 167
+
+  // Rows
+  var SETTINGS = {
+    delay: 33
+  , width: WIDTH
+  , lineHeight: LINE_HEIGHT
+  , baseLine: 133
+  , lineWidth: 2
+  , columns: 15
+  , colours: {
+      fill: "#222"
+    , text: "#fff"
+    , shadow: "#000"
+    , highlight: "#444"
+    }
+  }
+
+  SETTINGS.font = SETTINGS.lineHeight + "px Courier New,monospace"
+
+  ;(function initializeCanvas(){
+    canvas.width = WIDTH
+    canvas.height = HEIGHT
+  })()
+
+  function SplitFlapLine(canvas, top, settings, name) {
+    this.name = name
+    this.top = top
+    this.delay = settings.delay
+    this.width = settings.width
+    this.lineHeight = settings.lineHeight
+    this.baseLine = this.top + settings.baseLine
+    this.lineWidth = settings.lineWidth
+    this.columns = settings.columns
+    this.colours = clone(settings.colours) // not shared by others
+    // Helper values
+    this.halfBreadth = settings.lineWidth >> 1
+    this.halfHeight = settings.lineHeight >> 1
+    this.lineXArray = this.getLineXArray()
+    // Context
+    this.context = canvas.getContext("2d")
+    this.context.font = settings.font
+
+    this.displayText = Array(settings.columns + 1).join(" ")
+    this.updateTop = true
+
+    function clone(object) {
+      var copy = object.constructor()
+      for (var attribute in object) {
+        if (object.hasOwnProperty(attribute)) {
+          copy[attribute] = object[attribute];
+        }
+      }
+      return copy;
+    }
+  }
+
+  SplitFlapLine.prototype.getLineXArray = function getLineXArray() {
+    var array = [0]
+    var columnWidth = this.width / this.columns
+    for (var ii = 0; ii < this.columns; ii += 1) {
+      array.push(ii * columnWidth)
+    }
+    array.push(this.width)
+    array[0] = 1
+    return array
+  }
+
+  SplitFlapLine.prototype.update = function update() {
+    var that = this
+    var lineY
+    var context = this.context
+    var upper
+
+    context.save()
+    // Update either the top half or the bottom half
+    upper = (this.updateTop) ? this.top : this.top + this.halfHeight
+    context.rect(0, upper, this.width, this.halfHeight)
+    context.clip();
+    // // Switch for next update
+    this.updateTop = !this.updateTop
+
+    // Clear background in this half
+    context.beginPath()
+    context.rect(0, upper, this.width, this.halfHeight)
+    context.fillStyle = this.colours.fill
+    context.fill()
+
+    // Show text
+    context.fillStyle = this.colours.text
+    context.fillText(this.displayText, 0, this.baseLine)
+
+    // Create shadows
+    lineY = this.top + this.halfHeight - this.halfBreadth
+    context.strokeStyle = this.colours.shadow
+    context.lineWidth = this.lineWidth
+
+    context.beginPath();
+    // Split line
+    context.moveTo(0, lineY);
+    context.lineTo(this.width, lineY);
+    // Panels
+    this.lineXArray.forEach(function (lineX) {
+      lineX -= that.halfBreadth
+      context.moveTo(lineX, 0);
+      context.lineTo(lineX, that.lineHeight);
+    })
+    // Bottom
+    lineY = this.top + this.lineHeight - this.halfBreadth
+    context.moveTo(0, lineY);
+    context.lineTo(this.width, lineY);
+    context.stroke();
+
+    // Create highlight
+    lineY = this.top + this.halfHeight + this.halfBreadth
+    context.strokeStyle = this.colours.highlight
+
+    context.beginPath();
+    context.moveTo(0, lineY);
+    context.lineTo(this.width, lineY);
+
+    lineY = this.top + this.lineHeight
+    this.lineXArray.forEach(function (lineX) {
+      lineX += that.halfBreadth
+      context.moveTo(lineX, that.top);
+      context.lineTo(lineX, lineY);
+    })
+
+    lineY = this.top + this.halfBreadth
+    context.moveTo(0, lineY);
+    context.lineTo(this.width, lineY);
+    context.stroke();
+
+    context.restore()
+  }
+
+  SplitFlapLine.prototype.showPhrase = function showPhrase(phrase) {
+    while(phrase.length < 15) {
+      phrase += " "
+    }
+
+    this.displayText = phrase
+    this.update()
+    this.updateTop = false
+    this.update()
+    this.updateTop = true
+  }
+
+
+  SplitFlapLine.prototype.flip = function flip(phrase, callback) {
+    // Cycle through " A-Z" or "А-Ф" until phrase = displayText
+    var cyrillic = phrase.trim().charCodeAt(0) > 128
+    var that = this
+
+    while(phrase.length < 15) {
+      phrase += " "
+    }
+
+    ;(function flap(){
+      if (that.updateTop) {
+        var count = phrase.length
+        var newDisplay = ""
+        var displayChar
+
+        for (var ii = 0; ii < count; ii += 1) {
+          displayChar = that.displayText.charAt(ii)
+          if (phrase.charAt(ii) !== displayChar) {
+            displayChar = getNextChar(displayChar)
+          }
+
+          newDisplay += displayChar
+        }
+        that.displayText = newDisplay
+      }
+
+      that.update()
+
+      if (phrase === that.displayText && that.updateTop) {
+        if (typeof callback === "function") {
+          callback()
+        }
+      } else { // if (!that.updateTop) {
+        setTimeout(flap, that.delay)
+      }
+    })()
+
+    function getNextChar(char) {
+      var charNum = char.charCodeAt(0)
+
+      switch (charNum) {
+        case 32: // SPACE
+        case 160: // &nbsp;
+          if (cyrillic) {
+            charNum = 1032 // " " -> "А"
+          } else {
+            charNum = 65 // " " -> "A"
+          }
+        break
+        // Roman
+        case 90: // Z
+          charNum = 48 // "Z" -> "0"
+        break
+        case 57: // 9
+          charNum = 32 // "9" -> " "
+        break
+        // Cyrillic — not Ё (1025) between Е (1045) and Ж (1046)
+        case 1033: // Я
+          charNum = 1040 // 160
+        break
+        case 1071: // Я
+          charNum = 32 // 160
+        break
+        default:
+          charNum += 1
+      }
+
+      return String.fromCharCode(charNum)
+    }
+  }
+
+  SplitFlapLine.prototype.setTextColour = function setColour(colour) {
+    this.colours.text = colour
+    this.updateTop = true
+    this.update()
+    this.updateTop = false
+    this.update()
+    this.updateTop = true
+  }
+
+  ;(function presentation(){
+    var flapLines = []
+
+    var airports = [
+      "BKK BANGKOK"
+    , "BGO BERGEN"
+    , "VVO VLADIVOSTOK"
+    , "HEL HELSINKI"
+    , "LHR HEATHROW"
+    , "TSE ASTANA INTL"
+    , "BEG BELGRADE"
+    , "RVH RZHEVKA"
+    , "DME DOMODEDOVO"
+    , "LED PULKOVO"
+    , "MOW MOSCOW INTL"
+    , "SAO SAO PAOLO"
+    , "YOW OTTAWA"
+    ]
+    var memories = [
+      "YELLOW MUG"
+    , "LEPRECHAUN"
+    , "LUMPINI PARK"
+    , "DARKNESS LIGHT "
+    , "11 NOVEMBER"
+    , "TESLA MUSEUM"
+    , "13 FEBRUARY"
+    , "PAPER UNICORN"
+    , "НЕВЕСОМАЯ"
+    , "ПРОНИЦАТЕЛЬНАЯ"
+    , "ДАЛЕКАЯ БЛИЗКАЯ"
+    , "11 JANUARY"
+    , "BEAUTIFUL YOU"
+    , "УДИВИТЕЛЬНАЯ"
+    , "ОДАРЕННАЯ"
+    , "ЗЕМУН"
+    , "НЕПРЕДСКАЗУЕМАЯ"
+    , "SOUL TRADER"
+    , "ЦВЕТУЩАЯ"
+    , "ВНЕВРЕМЕННАЯ"
+    , "CERN"
+    , "FLOWER SHOP"
+    , "КРАЉИЦЕ МАРИЈЕ"
+    , "KIVIKUKAT"
+    , "BAKING BREAD"
+    , "LYONESSE"
+    , "ЗЕЛЕНАЯ ЗМЕЯ"
+    , "PROMISE TO LIVE"
+    ]
+    var heart = [
+      "  XXXX   XXXX  "
+    , "XX    XXX    XX"
+    , "RAKASTAN  SINUA"
+    , " MINUN  KAUNIS "
+    , " X ALEXANDRA X "
+    , "  X         X  "
+    , "    X     X    "
+    , "      XXX      "
+    , "       X       "
+    ]
+    var signature = [
+      ""
+    , "               "
+    , "               "
+    , "               "
+    , "               "
+    , "               "
+    , "               "
+    , "         Я ТВОЙ"
+    , "    SINUN JAMES"
+    ]
+
+    function shuffle(array) {
+      var current = array.length
+        , swap
+        , random
+
+      while (current) {
+        random = Math.floor(Math.random() * current--)
+        swap = array[current];
+        array[current] = array[random];
+        array[random] = swap;
+      }
+    }
+
+    function getRandom(array, maxIndex, dontRecycle) {
+      maxIndex = Math.min(array.length, maxIndex)
+      var random = Math.floor(Math.random() * maxIndex)
+      var value = array.splice(random, 1)[0]
+
+      if (!dontRecycle) {
+        array.push(value)
+      }
+
+      return value
+    }
+
+    function randomDelay(atLeast, randomness, callback) {
+      setTimeout(
+        callback
+      , Math.floor(Math.random() * randomness) + atLeast
+      )
+    }
+
+    ;(function animate(){
+      var total = 9
+      var recent = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+      var flapLine
+      var heartShown = false
+
+      ;(function showAirports(){
+        var ottawa = airports.pop() // ottawa
+        var bangkok = airports.shift()
+        shuffle(airports)
+        airports.unshift(bangkok)
+        airports.push(ottawa)
+
+        // Initialize display with first 9 airports
+        for (var ii = 0; ii < total; ii += 1) {
+          flapLine = new SplitFlapLine(
+            canvas
+          , ii * LINE_HEIGHT
+          , SETTINGS
+          )
+          flapLines.push(flapLine)
+          flapLine.showPhrase(airports.shift())
+        }
+
+        randomDelay(1000, 1000, swapAirports)
+        randomDelay(2000, 2000, swapAirports)
+
+        function swapAirports() {
+          randomDelay(0, 1000, newAiport)
+
+          function newAiport() {
+            if (airports.length) {
+              var airport = getRandom(airports, 4, true)
+              var index = getRandom(recent, 4, false)
+              flapLines[index].flip(airport, swapAirports)
+            } else {
+              showMemory()
+            }
+          }
+        }
+      })()
+
+      function showMemory() {
+        randomDelay(500, 1500, newMemory)
+
+        function newMemory() {
+          if (memories.length) {
+            var memory = getRandom(memories, 12, true)
+            var index = getRandom(recent, 4, false)
+            flapLines[index].flip(memory, showMemory)
+          } else if (!heartShown) {
+            showHeart()
+          }
+        }
+      }
+
+      function showHeart() {
+        var lines = [3, 7, 1, 6, 8, 0, 2, 4, 5]
+        randomDelay(500, 1500, newHeart)
+        heartShown = true
+
+        function newHeart() {
+          if (lines.length) {
+            var index = lines.shift()
+            var line = heart[index]
+            flapLines[index].flip(line, newHeart)
+          } else {
+            randomDelay(2000, 0, clear)
+          }
+        }
+      }
+
+      function clear() {
+        var length = signature.length
+        if (length) {
+          flapLines[9 - length].flip(signature.shift(), clear)
+        } else {
+          canvas.classList.add("fade")
+        }
+      }
+    })()
+  })()
+})()
+</script>
